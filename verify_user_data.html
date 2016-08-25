@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<j:jelly trim="false" xmlns:j="jelly:core" xmlns:g="glide" xmlns:j2="null" xmlns:g2="null">
+	<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.0/angular.js"></script>
+
+	<div ng-app="usrVerify">
+		<div ng-controller="VerifyController" class="container">
+
+			<h3> {{ userObj[0].name }} </h3>
+
+			<ul class="nav nav-tabs">
+				<li ng-class="activeTab1" ng-click="activateTab(1)"><a>Your Information</a></li>
+				<li ng-class="activeTab2" ng-click="activateTab(2)"><a>People You Manage</a></li>
+				<li ng-class="activeTab3" ng-click="activateTab(3)"><a>Summary / Submit</a></li>
+			</ul>
+
+			<div class="tab-content">
+
+				<div ng-hide="activeTab1 != 'active'">
+					<div class="col-md-10 col-md-offset-1">
+						<h3> You are directly report to {{ userObj[0].manager.value }} </h3>
+					</div>
+				</div>
+
+				<div ng-hide="activeTab2 != 'active'">
+					<div class="col-md-8 col-md-offset-2">
+						<div class="row"><h3>Employees who directly report to you...</h3></div>
+
+						<div class="row">
+						<table class="table">
+							<tr ng-class="managedByObj.status" ng-repeat="managedByObj in managedByObjs">
+								<td><h4>{{ managedByObj.name }}</h4></td>
+								<td><h4>{{ managedByObj.email }}</h4></td>
+								<td><h4>{{ managedByObj.title }}</h4></td>
+								<td>
+									<button type="button"
+											class="btn btn-danger pull-right"
+											ng-click="removeEmp(managedByObj)"
+											ng-show="managedByObj.status == 'emp-keep'">
+										Remove Employee
+									</button>
+									<button type="button"
+											class="btn btn-success pull-right"
+											ng-click="removeEmp(managedByObj)"
+											ng-show="managedByObj.status == 'emp-remove'">
+										Add Employee
+									</button>
+								</td>
+							</tr>
+
+							<tr class="emp-add" ng-repeat="addedEmp in addedEmps">
+								<td><h4>{{ addedEmp.name }}</h4></td>
+								<td><h4>{{ addedEmp.email }}</h4></td>
+								<td><h4>{{ addedEmp.title }}</h4></td>
+								<td>
+									<button type="button"
+										class="btn btn-danger pull-right"
+										ng-click="removeAddedEmp(addedEmp)">
+											Remove Employee
+									</button>
+								</td>
+							</tr>
+
+							<tr>
+								<td><input class="form-control" placeholder="Name.." ng-model="newEmp.name" required="string"/></td>
+								<td><input class="form-control" placeholder="Email.." ng-model="newEmp.email"/></td>
+								<td><input class="form-control" placeholder="Title.." ng-model="newEmp.title"/></td>
+								<td>
+									<button type="button"
+											class="btn btn-success pull-right"
+											ng-click="addEmployee()">
+										Add Employee
+									</button>
+								</td>
+							</tr>
+
+						</table>
+						</div>
+
+					</div>
+				</div>
+
+				<div ng-hide="activeTab3 != 'active'">
+					<h2>tab 3</h2>
+				</div>
+
+			</div>
+		</div>
+	</div>
+
+	<style>
+		.emp-keep {
+			background-color: rgba(0,150,255,0.25);
+		}
+		.emp-add {
+			background-color: rgba(0,255,0,0.25);
+		}
+		.emp-remove {
+			background-color: rgba(255,0,0,0.25);
+		}
+	</style>
+
+	<script>
+	var verApp = angular.module('usrVerify', []);
+
+	verApp.controller('VerifyController', [ '$scope', '$http', function($scope, $http) {
+		$scope.url = '/api/now/table/sys_user?';
+		//$http.defaults.headers.common.Accept = "application/json";
+
+		$scope.user = g_user.userID;
+		$scope.query = '';
+		$scope.newEmp = {name: '', email: '', title: ''};
+		$scope.addedEmps = [];
+		$scope.activeTab1 = 'active';
+		$scope.activeTab2 = '';
+		$scope.activeTab3 = '';
+
+
+		$scope.removeEmp = function(managedByObj){
+			if(managedByObj.status == 'emp-keep')
+				managedByObj.status = 'emp-remove';
+			else
+				managedByObj.status = 'emp-keep';
+		};
+
+		$scope.addEmployee = function(){
+			if($scope.newEmp.name == ''){
+				alert('Employee name is mandatory');
+				return;
+			}
+
+			$scope.addedEmps.push($scope.newEmp);
+			$scope.newEmp = {name: '', email: '', title: ''};
+		};
+
+		$scope.removeAddedEmp = function(addedEmp){
+			var elementIndex = $scope.addedEmps.map(function(n){return n.name;}).indexOf(addedEmp.name);
+			$scope.addedEmps.splice(elementIndex,1);
+		};
+
+		$scope.activateTab = function(tabNum){
+			$scope.activeTab1 = '';
+			$scope.activeTab2 = '';
+			$scope.activeTab3 = '';
+			$scope['activeTab' + tabNum] = 'active';
+		};
+
+		_getUserData();
+		_getManagedUsers();
+
+		function _getUserData() {
+			$scope.query = 'sysparm_limit=1&sysparm_query=sys_id=' + $scope.user;
+
+			$http.get($scope.url + $scope.query)
+				.success(function (data, status, headers, config) {
+					$scope.userObj = data.result;
+					console.log(JSON.stringify(data.result));
+				})
+				.error(function (data, status, headers, config) {
+					$scope.userObj = [{'name':'Error'}];
+				});
+		}
+
+		function _getManagedUsers() {
+			$scope.query = 'sysparm_query=manager=' + $scope.user;
+
+			$http.get($scope.url + $scope.query)
+				.success(function (data, status, headers, config) {
+					$scope.managedByObjs = data.result;
+					for(var obj in $scope.managedByObjs)
+						$scope.managedByObjs[obj].status = 'emp-keep';
+				})
+				.error(function (data, status, headers, config) {
+					$scope.managedByObjs = [{'name':'Error'}];
+				});
+		}
+
+	}]);
+
+	</script>
+
+</j:jelly>
